@@ -7,8 +7,25 @@ from waste_collection_schedule import Collection
 TITLE = "City of Parramatta"
 DESCRIPTION = "Source script for cityofparramatta.nsw.gov.au"
 URL = "https://www.cityofparramatta.nsw.gov.au"
+COUNTRY = "au"
 TEST_CASES = {
     "126 Church Street": {"address": "126 Church Street Parramatta"},
+}
+
+PARAM_TRANSLATIONS = {
+    "en": {
+        "address": "Address",
+    }
+}
+
+PARAM_DESCRIPTIONS = {
+    "en": {
+        "address": "Full address (e.g., '126 Church Street Parramatta')",
+    }
+}
+
+HOW_TO_GET_ARGUMENTS_DESCRIPTION = {
+    "en": "Enter your full address including the suburb. Example: `126 Church Street Parramatta`",
 }
 
 API_MAP_URL = "https://services6.arcgis.com/NrOjMi9LSYL3MUze/arcgis/rest/services/CoP_Garbage_Recyle_July2021/FeatureServer/0/query"
