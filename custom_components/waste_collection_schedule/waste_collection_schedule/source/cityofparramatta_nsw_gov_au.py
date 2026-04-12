@@ -32,9 +32,9 @@ API_MAP_URL = "https://services6.arcgis.com/NrOjMi9LSYL3MUze/arcgis/rest/service
 GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
 
 ICON_MAP = {
-    "General Waste": "mdi:trash-can",
-    "Recycling": "mdi:recycle",
-    "Garden Organics": "mdi:leaf",
+    "General Waste (Red Bin)": "mdi:trash-can",
+    "Recycling (Yellow Bin)": "mdi:recycle",
+    "Garden Organics (Green Bin)": "mdi:leaf",
 }
 
 # The reference date points to a known Monday for an "Area 1" Recycling week.
@@ -149,18 +149,18 @@ class Source:
         for i in range(4):
             entries.append(Collection(
                 date=next_general + timedelta(days=i*7),
-                t="General Waste",
-                icon=ICON_MAP.get("General Waste")
+                t="General Waste (Red Bin)",
+                icon=ICON_MAP.get("General Waste (Red Bin)")
             ))
 
         # Recycling (Fortnightly)
         recycling_dates = self.get_collection_dates(collection_day, is_area_1, is_recycling=True)
         for d in recycling_dates:
-            entries.append(Collection(date=d, t="Recycling", icon=ICON_MAP.get("Recycling")))
+            entries.append(Collection(date=d, t="Recycling (Yellow Bin)", icon=ICON_MAP.get("Recycling (Yellow Bin)")))
 
         # Garden Organics / FOGO (Alternate Fortnightly)
         fogo_dates = self.get_collection_dates(collection_day, is_area_1, is_recycling=False)
         for d in fogo_dates:
-            entries.append(Collection(date=d, t="Garden Organics", icon=ICON_MAP.get("Garden Organics")))
+            entries.append(Collection(date=d, t="Garden Organics (Green Bin)", icon=ICON_MAP.get("Garden Organics (Green Bin)")))
 
         return entries
