@@ -393,6 +393,12 @@
       "id": "onkaparingacity_com"
     },
     {
+      "title": "City of Parramatta",
+      "module": "cityofparramatta_nsw_gov_au",
+      "default_params": {},
+      "id": "cityofparramatta_nsw_gov_au"
+    },
+    {
       "title": "City of Port Adelaide Enfield",
       "module": "app_my_local_services_au",
       "default_params": {},

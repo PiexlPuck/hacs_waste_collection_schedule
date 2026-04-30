@@ -228,6 +228,13 @@
     "howto": {},
     "urls": {}
   },
+  "cityofparramatta_nsw_gov_au": {
+    "docs_url": "https://github.com/mampfes/hacs_waste_collection_schedule/blob/master/doc/source/cityofparramatta_nsw_gov_au.md",
+    "howto": {
+      "en": "Enter your full address including the suburb. Example: `126 Church Street Parramatta`"
+    },
+    "urls": {}
+  },
   "rockingham_wa_gov_au": {
     "docs_url": "https://github.com/mampfes/hacs_waste_collection_schedule/blob/master/doc/source/rockingham_wa_gov_au.md",
     "howto": {},
