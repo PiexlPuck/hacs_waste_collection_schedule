@@ -1,8 +1,9 @@
 import urllib.parse
 from datetime import datetime, timedelta
-import requests
 
+import requests
 from waste_collection_schedule import Collection
+from waste_collection_schedule.exceptions import SourceArgumentNotFound
 
 TITLE = "City of Parramatta"
 DESCRIPTION = "Source script for cityofparramatta.nsw.gov.au"
@@ -13,15 +14,13 @@ TEST_CASES = {
 }
 
 PARAM_TRANSLATIONS = {
-    "en": {
-        "address": "Address",
-    }
+    "en": {"address": "Address"},
 }
 
 PARAM_DESCRIPTIONS = {
     "en": {
-        "address": "Full address (e.g., '126 Church Street Parramatta')",
-    }
+        "address": "Full address including suburb (e.g. '126 Church Street Parramatta')"
+    },
 }
 
 HOW_TO_GET_ARGUMENTS_DESCRIPTION = {
@@ -41,47 +40,60 @@ ICON_MAP = {
 # Adjust this if the parity is wrong. Area 2 will be the week after.
 REFERENCE_DATE_AREA_1_RECYCLING = datetime(2024, 1, 1).date()
 
+
 class Source:
     def __init__(self, address):
         self._address = address
 
     def get_collection_dates(self, collection_day_str, is_area_1, is_recycling):
         # Determine 0-6 weekday
-        weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        weekdays = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
         if collection_day_str not in weekdays:
             return []
-        
+
         target_wday = weekdays.index(collection_day_str)
         today = datetime.now().date()
-        
+
         # Calculate days until the next occurrence of this weekday
         days_until = (target_wday - today.weekday() + 7) % 7
         next_date = today + timedelta(days=days_until)
-        
+
         # Decide the reference week for this bin and area
         # For Parramatta, FOGO and Recycling are alternating weeks.
         # Area 1: Recycling Week X, FOGO Week X+1
         # Area 2: Recycling Week X+1, FOGO Week X
-        
+
         # Base reference date
         ref_base = REFERENCE_DATE_AREA_1_RECYCLING
-        
+
         # If it's Area 2, shift the reference for Recycling by 7 days
         if not is_area_1:
             ref_base += timedelta(days=7)
-            
+
         # If it's FOGO (not recycling), shift by 7 days to alternate
         if not is_recycling:
             ref_base += timedelta(days=7)
-            
+
         # Calculate full weeks between ref_base and next_date
         days_diff = (next_date - ref_base).days
-        
+
         # If the number of weeks is odd, it's the wrong week, so add 7 days
         if (days_diff // 7) % 2 != 0:
             next_date += timedelta(days=7)
 
-        return [next_date, next_date + timedelta(days=14), next_date + timedelta(days=28)]
+        return [
+            next_date,
+            next_date + timedelta(days=14),
+            next_date + timedelta(days=28),
+        ]
 
     def fetch(self):
         address = urllib.parse.quote(self._address)
@@ -91,19 +103,19 @@ class Source:
             "f": "json",
             "SingleLine": address,
             "outFields": "Match_addr",
-            "maxLocations": "1"
+            "maxLocations": "1",
         }
-        r_geo = requests.get(GEOCODE_URL, params=geo_params)
+        r_geo = requests.get(GEOCODE_URL, params=geo_params, timeout=30)
         r_geo.raise_for_status()
-        
+
         candidates = r_geo.json().get("candidates", [])
         if not candidates:
-            raise Exception("Address not found via ArcGIS Geocoder")
-            
+            raise SourceArgumentNotFound("address", self._address)
+
         location = candidates[0].get("location")
         if not location:
-            raise Exception("Coordinates not found for address")
-            
+            raise SourceArgumentNotFound("address", self._address)
+
         lat, lon = location["y"], location["x"]
 
         # 2. Query Parramatta Map API
@@ -115,52 +127,76 @@ class Source:
             "spatialRel": "esriSpatialRelIntersects",
             "geometryType": "esriGeometryPoint",
             "geometry": f"{lon},{lat}",
-            "inSR": "4326" # Standard lat/long WKID
+            "inSR": "4326",  # Standard lat/long WKID
         }
-        
-        r_api = requests.get(API_MAP_URL, params=api_params)
+
+        r_api = requests.get(API_MAP_URL, params=api_params, timeout=30)
         r_api.raise_for_status()
-        
+
         features = r_api.json().get("features", [])
         if not features:
-            raise Exception("Address found but Parramatta Map returned no waste zone information.")
-            
+            raise SourceArgumentNotFound("address", self._address)
+
         properties = features[0].get("attributes", {})
-        
-        # DAY output is usually capitalized like "Tuesday"
+
         collection_day = properties.get("DAY", "").strip().capitalize()
-        # WEEK output is usually like "Area 2" or "Area 1"
         week_str = properties.get("WEEK", "").strip().lower()
-        
+
         if not collection_day or not week_str:
-            raise Exception(f"Unable to parse DAY or WEEK from Parramatta API properties: {properties}")
+            raise SourceArgumentNotFound("address", self._address)
 
         is_area_1 = "area 1" in week_str
 
         entries = []
-        
+
         today = datetime.now().date()
-        weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        weekdays = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
         target_wday = weekdays.index(collection_day)
-        
+
         # General Waste is weekly
         days_until_general = (target_wday - today.weekday() + 7) % 7
         next_general = today + timedelta(days=days_until_general)
         for i in range(4):
-            entries.append(Collection(
-                date=next_general + timedelta(days=i*7),
-                t="General Waste (Red Bin)",
-                icon=ICON_MAP.get("General Waste (Red Bin)")
-            ))
+            entries.append(
+                Collection(
+                    date=next_general + timedelta(days=i * 7),
+                    t="General Waste (Red Bin)",
+                    icon=ICON_MAP.get("General Waste (Red Bin)"),
+                )
+            )
 
         # Recycling (Fortnightly)
-        recycling_dates = self.get_collection_dates(collection_day, is_area_1, is_recycling=True)
+        recycling_dates = self.get_collection_dates(
+            collection_day, is_area_1, is_recycling=True
+        )
         for d in recycling_dates:
-            entries.append(Collection(date=d, t="Recycling (Yellow Bin)", icon=ICON_MAP.get("Recycling (Yellow Bin)")))
+            entries.append(
+                Collection(
+                    date=d,
+                    t="Recycling (Yellow Bin)",
+                    icon=ICON_MAP.get("Recycling (Yellow Bin)"),
+                )
+            )
 
         # Garden Organics / FOGO (Alternate Fortnightly)
-        fogo_dates = self.get_collection_dates(collection_day, is_area_1, is_recycling=False)
+        fogo_dates = self.get_collection_dates(
+            collection_day, is_area_1, is_recycling=False
+        )
         for d in fogo_dates:
-            entries.append(Collection(date=d, t="Garden Organics (Green Bin)", icon=ICON_MAP.get("Garden Organics (Green Bin)")))
+            entries.append(
+                Collection(
+                    date=d,
+                    t="Garden Organics (Green Bin)",
+                    icon=ICON_MAP.get("Garden Organics (Green Bin)"),
+                )
+            )
 
         return entries
